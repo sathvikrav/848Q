@@ -12,6 +12,8 @@ from tqdm import tqdm
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
+import gensim.downloader
 
 MODEL_PATH = 'tfidf.pickle'
 INDEX_PATH = 'index.pickle'
@@ -22,7 +24,6 @@ import os
 
 from nltk.tokenize import sent_tokenize
 from guesser import print_guess, Guesser
-
 
 class DummyVectorizer:
     """
@@ -50,7 +51,9 @@ class TfidfGuesser(Guesser):
         """
 
         # You'll need add the vectorizer here and replace this fake vectorizer
-        self.tfidf_vectorizer = DummyVectorizer()
+        # self.tfidf_vectorizer = DummyVectorizer()
+        self.tfidf_vectorizer = TfidfVectorizer(min_df=min_df, max_df=max_df, stop_words='english')
+        self.word_vectors_model = gensim.downloader.load('word2vec-google-news-300')
         self.tfidf = None 
         self.questions = None
         self.answers = None
@@ -65,11 +68,11 @@ class TfidfGuesser(Guesser):
         the matrix representation of the documents (tfidf) consistent
         with that vectorizer.
         """
-
+        # import pdb; pdb.set_trace()
         Guesser.train(self, training_data, answer_field, split_by_sentence, min_length,
                           max_length, remove_missing_pages)
 
-        self.tfidf = self.tfidf_vectorizer.transform(self.questions)
+        self.tfidf = self.tfidf_vectorizer.fit_transform(self.questions)
         logging.info("Creating tf-idf dataframe with %i" % len(self.questions))
         
     def save(self):
@@ -111,7 +114,8 @@ class TfidfGuesser(Guesser):
         for i in range(max_n_guesses):
             # The line below is wrong but lets the code run for the homework.
             # Remove it or fix it!
-            idx = i
+            # idx = i
+            idx = indices[i]
             guess =  {"question": self.questions[idx], "guess": self.answers[idx],
                       "confidence": cos[idx]}
             guesses.append(guess)
@@ -146,21 +150,33 @@ class TfidfGuesser(Guesser):
         logging.info("Querying matrix of size %i with block size %i" %
                      (len(questions), block_size))
 
+        # self.word_vectors_model = gensim.downloader.load('word2vec-google-news-300')
         # The next line of code is bogus, this needs to be fixed
         # to give you a real answer.
-        top_hits = np.array([list(range(max_n_guesses-1, -1, -1))]*block_size)
+        # top_hits = np.array([list(range(max_n_guesses-1, -1, -1))]*block_size)
         for start in tqdm(range(0, len(questions), block_size)):
             stop = start+block_size
             block = questions[start:stop]
             logging.info("Block %i to %i (%i elements)" % (start, stop, len(block)))
+
             
-            
+            question_tfidf = self.tfidf_vectorizer.transform(block)
+            cosine_similarities = cosine_similarity(question_tfidf, self.tfidf)
+            top_hits = np.argpartition(cosine_similarities, len(cosine_similarities[0]) - max_n_guesses, -1)[:,::-1]
 
             for question in range(len(block)):
                 guesses = []
-                for idx in list(top_hits[question]):
-                    score = 0.0
-                    guesses.append({"guess": self.answers[idx], "confidence": score, "question": self.questions[idx]})
+                # for idx in list(top_hits[question]):
+                for i in range(max_n_guesses):
+                    idx = top_hits[question][i]
+                    score = cosine_similarities[question][idx]
+                    nonzero_out_f_names = self.tfidf_vectorizer.get_feature_names_out()[np.argwhere(question_tfidf[question] > 0.0)[:,1]]
+                    embed_f = [self.word_vectors_model[feat] for feat in nonzero_out_f_names if feat in self.word_vectors_model]
+                    embed_answer = [self.word_vectors_model[self.answers[idx]]] if self.answers[idx] in self.word_vectors_model else None
+                    max_feat_cos = max(cosine_similarity(embed_answer, embed_f)[0]) if embed_answer is not None else None
+                    guesses.append({"guess": self.answers[idx], "confidence": score, "question": self.questions[idx], "feature_similarity": max_feat_cos}) # Re-rank the guesses
+                # import pdb; pdb.set_trace()
+                guesses.sort(key=lambda guess: (guess['confidence'], guess["feature_similarity"] is not None, guess["feature_similarity"]), reverse=True)
                 all_guesses.append(guesses)
 
         assert len(all_guesses) == len(questions), "Guesses (%i) != questions (%i)" % (len(all_guesses), len(questions))
