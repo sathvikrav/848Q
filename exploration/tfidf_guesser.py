@@ -173,7 +173,7 @@ class TfidfGuesser(Guesser):
                     nonzero_out_f_names = self.tfidf_vectorizer.get_feature_names_out()[np.argwhere(question_tfidf[question] > 0.0)[:,1]]
                     embed_f = [self.word_vectors_model[feat] for feat in nonzero_out_f_names if feat in self.word_vectors_model]
                     embed_answer = [self.word_vectors_model[self.answers[idx]]] if self.answers[idx] in self.word_vectors_model else None
-                    max_feat_cos = max(cosine_similarity(embed_answer, embed_f)[0]) if embed_answer is not None and embed_f is not None else None
+                    max_feat_cos = max(cosine_similarity(embed_answer, embed_f)[0]) if embed_answer is not None and len(embed_f) > 0 else None
                     guesses.append({"guess": self.answers[idx], "confidence": score, "question": self.questions[idx], "feature_similarity": max_feat_cos}) # Re-rank the guesses
                 # import pdb; pdb.set_trace()
                 guesses.sort(key=lambda guess: (guess['confidence'], guess["feature_similarity"] is not None, guess["feature_similarity"]), reverse=True)
