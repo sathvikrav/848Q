@@ -255,10 +255,9 @@ class WikiFeature(Feature):
         self.name = name
         self.wiki_wiki = wikipediaapi.Wikipedia('Exploration 848Q (psivaram@umd.edu)', 'en', extract_format=wikipediaapi.ExtractFormat.WIKI)
         self.model = gensim.downloader.load('word2vec-google-news-300')
-        if os.path.isfile("wiki_pages.pkl"):
-            with open('wiki_pages.pkl', 'rb') as infile:
-                self.cached_pages = pickle.load(infile)
-        else:
+        try:
+            self.cached_pages = pickle.load(open("wiki_pages.pkl", "rb"))
+        except (OSError, IOError) as e:
             self.cached_pages = {}
 
     def __call__(self, question, run, guess):
@@ -273,10 +272,10 @@ class WikiFeature(Feature):
                 else:
                     page = self.wiki_wiki.page(word)
                     if page.exists():
-                        wiki_summaries.append(page.summary)
+                        summary = page.summary
+                        wiki_summaries.append(summary)
+                        self.cached_pages[word] = summary
 
-        pickle.dump(self.cached_pages, open("wiki_pages.pkl", "wb"))
-        
         if len(wiki_summaries) == 0:
             yield("sim", 0)
             return
