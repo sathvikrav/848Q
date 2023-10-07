@@ -37,7 +37,7 @@ def print_guess(guess, max_char=20):
     """
     Utility function for printing out snippets (up to max_char) of top guesses.
     """
-    
+
     standard = ["guess", "confidence", "question"]
     output = ""
 
@@ -48,7 +48,7 @@ def print_guess(guess, max_char=20):
             else:
                 short = str(guess[ii])[:max_char]
             output += "%s:%s\t" % (ii, short)
-            
+
     return output
 
 
@@ -205,6 +205,35 @@ class Guesser:
         Generate a guess set from a single question.
         """
         return [{"guess": self._default_guess, "confidence": 1.0}]
+    
+# Make an improvement to the guesser that uses representation learning in some way. 
+# This must be a subclass of the generic "Guesser" class that respects the underlying API. 
+# This could be a Muppet model or something simpler.
+
+from gensim.models import Word2Vec
+from sklearn.metrics.pairwise import cosine_similarity
+
+class GuessBetter(Guesser):
+    def __init__(self, default_guess="Les Misérables (musical)", embedding_model=None):
+        super().__init__(default_guess)
+        self.embedding_mode = embedding_model
+    
+    def load_embeddings(self, embedding_file):
+        # Load pre-trained word embeddings (e.g., Word2Vec)
+        self.embedding_model = Word2Vec.load(embedding_file)
+
+    def calculate_embedding(self, text):
+        # Calculate the vector representation of a text using word embeddings
+        if self.embedding_model is not None:
+            words = word_tokenize(text)
+            word_vectors = [self.embedding_model.wv[word] for word in words if word in self.embedding_model.wv]
+            
+            if word_vectors:
+                # Average the word vectors to get a document representation
+                doc_vector = sum(word_vectors) / len(word_vectors)
+                return doc_vector
+        
+        return None
 
 
 if __name__ == "__main__":
@@ -245,3 +274,4 @@ if __name__ == "__main__":
             guesser.set_eval_data(dev_exs)
             guesser.train_dan()
         guesser.save()
+
