@@ -28,7 +28,7 @@ def add_question_params(parser):
 
 def add_buzzer_params(parser):
     parser.add_argument('--buzzer_guessers', nargs='+', default = ['TfidfGuesser'], help='Guessers to feed into Buzzer', type=str)
-    parser.add_argument('--features', nargs='+', help='Features to feed into Buzzer', type=str,  default=['Length'])    
+    parser.add_argument('--features', nargs='+', help='Features to feed into Buzzer', type=str,  default=['Length', 'Wiki'])    
     parser.add_argument('--buzzer_type', type=str, default="LogisticBuzzer")
     parser.add_argument('--run_length', type=int, default=100)
     parser.add_argument('--LogisticBuzzer_filename', type=str, default="models/LogisticBuzzer")    
@@ -194,4 +194,9 @@ def load_buzzer(flags, load=False):
             from features import LengthFeature
             feature = LengthFeature(ff)
             buzzer.add_feature(feature)
+        if ff == "Wiki":
+            from features import WikiFeature
+            feature = WikiFeature(ff)
+            buzzer.add_feature(feature)
+        
     return buzzer

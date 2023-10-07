@@ -240,3 +240,54 @@ class WordnetFeature(Feature):
         toks = guess.split(' ')
         r = [wordnet.synsets(t) for t in toks]
         yield ('true', bool(question['gameplay']))
+
+
+import wikipediaapi
+import nltk
+import gensim.downloader
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+class WikiFeature(Feature):
+    def __init__(self, name):
+        self.name = name
+        self.wiki_wiki = wikipediaapi.Wikipedia('Exploration 848Q (psivaram@umd.edu)', 'en', extract_format=wikipediaapi.ExtractFormat.WIKI)
+        self.model = gensim.downloader.load('word2vec-google-news-300')
+
+    def __call__(self, question, run, guess):
+        words = nltk.word_tokenize(run)
+        tagged_words = nltk.pos_tag(words)
+
+        wiki_summaries = []
+        for word, tag in tagged_words:
+            if tag == "NNP" or tag == "NNPS":
+                page = self.wiki_wiki.page(word)
+                if page.exists():
+                    wiki_summaries.append(page.summary)
+
+        if len(wiki_summaries) == 0:
+            yield("sim", 0)
+            return
+
+        summary_entities = []
+        for summary in wiki_summaries:
+            summary_words = nltk.word_tokenize(summary)
+            summary_tags = nltk.pos_tag(summary_words)
+            for word, tag in summary_tags:
+                if tag == "NNP" or tag == "NNPS":
+                    summary_entities.append(word)
+
+        if len(summary_entities) == 0:
+            yield("sim", 0)
+
+        if guess in self.model:
+            guess_embedding = self.model[guess]
+            summary_embeddings = [self.model[x] for x in summary_entities if x in self.model]
+            guess_embedding = np.array([guess_embedding])
+
+            if len(summary_embeddings) != 0:
+                sim = cosine_similarity(guess_embedding, summary_embeddings)
+                yield("sim", max(sim[0]))
+            else:
+                yield("sim", 0)
+        yield("sim", 0)
