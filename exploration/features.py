@@ -247,12 +247,19 @@ import nltk
 import gensim.downloader
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import pickle
+import os.path
 
 class WikiFeature(Feature):
     def __init__(self, name):
         self.name = name
         self.wiki_wiki = wikipediaapi.Wikipedia('Exploration 848Q (psivaram@umd.edu)', 'en', extract_format=wikipediaapi.ExtractFormat.WIKI)
         self.model = gensim.downloader.load('word2vec-google-news-300')
+        if os.path.isfile("wiki_pages.pkl"):
+            with open('wiki_pages.pkl', 'rb') as infile:
+                self.cached_pages = pickle.load(infile)
+        else:
+            self.cached_pages = {}
 
     def __call__(self, question, run, guess):
         words = nltk.word_tokenize(run)
@@ -261,10 +268,15 @@ class WikiFeature(Feature):
         wiki_summaries = []
         for word, tag in tagged_words:
             if tag == "NNP" or tag == "NNPS":
-                page = self.wiki_wiki.page(word)
-                if page.exists():
-                    wiki_summaries.append(page.summary)
+                if word in self.cached_pages:
+                    wiki_summaries.append(self.cached_pages[word])
+                else:
+                    page = self.wiki_wiki.page(word)
+                    if page.exists():
+                        wiki_summaries.append(page.summary)
 
+        pickle.dump(self.cached_pages, open("wiki_pages.pkl", "wb"))
+        
         if len(wiki_summaries) == 0:
             yield("sim", 0)
             return

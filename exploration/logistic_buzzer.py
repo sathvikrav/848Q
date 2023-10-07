@@ -25,6 +25,8 @@ class LogisticBuzzer(Buzzer):
         with open("%s.model.pkl" % self.filename, 'wb') as outfile:
             pickle.dump(self._classifier, outfile)
 
+        pickle.dump(self._features[1].cached_pages, open("wiki_pages.pkl", "wb"))
+
     def load(self):
         Buzzer.load(self)
         with open("%s.model.pkl" % self.filename, 'rb') as infile:
